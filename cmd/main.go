@@ -6,11 +6,32 @@ import (
 	"net/http"
 	"net/url"
 	"regexp"
+	"strings"
 )
+
+type WebSite struct {
+	url  string
+	name string
+	gifs []string
+}
+
+func NewWebSite(url string) WebSite {
+	// name := strings.Split(url, "//")
+	reSearchName := regexp.MustCompile(`//([^.]+)\.`)
+	name := reSearchName.FindStringSubmatch(url)
+
+	return WebSite{
+		url:  url,
+		name: name[1],
+		gifs: nil,
+	}
+}
 
 func main() {
 	url := "https://pixelsafari.neocities.org/buttons/"
-	response, err := http.Get(url)
+	webSite := NewWebSite(url)
+
+	response, err := http.Get(webSite.url)
 	if err != nil {
 		return
 	}
@@ -25,9 +46,9 @@ func main() {
 
 	for _, match := range matches {
 
-		// gifName := strings.Split(match[2], "/")[2]
-		fmt.Println("Gif Found:", match)
-		// downloadImage(url, gifName)
+		gifName := strings.Split(match[2], "/")[2]
+		gifName = strings.Trim(gifName, "\"")
+		downloadImage(url, gifName)
 	}
 }
 
