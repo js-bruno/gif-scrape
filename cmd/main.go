@@ -5,6 +5,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"os"
 	"regexp"
 	"strings"
 )
@@ -12,7 +13,12 @@ import (
 type WebSite struct {
 	url  string
 	name string
-	gifs []string
+	gifs []Gif
+}
+
+type Gif struct {
+	url  string
+	name string
 }
 
 func NewWebSite(url string) WebSite {
@@ -28,34 +34,73 @@ func NewWebSite(url string) WebSite {
 }
 
 func main() {
-	url := "https://pixelsafari.neocities.org/buttons/"
-	webSite := NewWebSite(url)
-
+	urlWeb := "https://pixelsafari.neocities.org/buttons/"
+	webSite := NewWebSite(urlWeb)
 	response, err := http.Get(webSite.url)
+
 	if err != nil {
-		return
+		fmt.Println(err.Error())
 	}
+
 	defer response.Body.Close()
 	htmlBodyText, err := io.ReadAll(response.Body)
 	if err != nil {
-		fmt.Print(err.Error())
+		fmt.Println(err.Error())
 	}
 
 	reSearchTags := regexp.MustCompile(`<\s*([img]+)(\s[^>]*)?>`)
 	matches := reSearchTags.FindAllStringSubmatch(string(htmlBodyText), -1)
 
 	for _, match := range matches {
-
+		fmt.Println(match[2])
 		gifName := strings.Split(match[2], "/")[2]
 		gifName = strings.Trim(gifName, "\"")
-		downloadImage(url, gifName)
+
+		gifURL, err := url.JoinPath(webSite.url, gifName)
+
+		fmt.Println(gifURL)
+		if err != nil {
+			fmt.Println(err.Error())
+		}
+		webSite.gifs = append(webSite.gifs, Gif{
+			url:  gifURL,
+			name: gifName,
+		})
+	}
+
+	err = downloadImage(webSite)
+	if err != nil {
+		fmt.Println(err.Error())
 	}
 }
 
-func downloadImage(baseURL, gifName string) {
-	downlaodURL, err := url.JoinPath(baseURL, gifName)
-	if err != nil {
-		return
+func downloadImage(web WebSite) (err error) {
+	for _, gif := range web.gifs {
+		resp, err := http.Get(gif.url)
+		if err != nil {
+			return err
+		}
+
+		os.Mkdir(web.name, 0755)
+		if err != nil {
+			return err
+		}
+		gifAddrs := web.name + "/" + gif.name
+		file, err := os.Create(gifAddrs)
+		fmt.Println(gifAddrs)
+		if err != nil {
+			return err
+		}
+		defer file.Close()
+
+		_, err = io.Copy(file, resp.Body)
+		if err != nil {
+			return err
+		}
+		fmt.Println("Downloading: " + gifAddrs)
+
 	}
-	fmt.Println("DOWNLOAD URL: ", downlaodURL)
+
+	return nil
+
 }
