@@ -8,6 +8,7 @@ import (
 	"os"
 	"regexp"
 	"strings"
+	"sync"
 )
 
 type WebSite struct {
@@ -68,39 +69,45 @@ func main() {
 		})
 	}
 
-	err = downloadImage(webSite)
-	if err != nil {
-		fmt.Println(err.Error())
+	var wg sync.WaitGroup
+	for i, gif := range webSite.gifs {
+		wg.Add(1)
+		go downloadWorker(i, &wg, webSite.name, gif)
 	}
+	wg.Wait()
 }
 
-func downloadImage(web WebSite) (err error) {
-	for _, gif := range web.gifs {
-		resp, err := http.Get(gif.url)
-		if err != nil {
-			return err
-		}
-
-		os.Mkdir(web.name, 0755)
-		if err != nil {
-			return err
-		}
-		gifAddrs := web.name + "/" + gif.name
-		file, err := os.Create(gifAddrs)
-		fmt.Println(gifAddrs)
-		if err != nil {
-			return err
-		}
-		defer file.Close()
-
-		_, err = io.Copy(file, resp.Body)
-		if err != nil {
-			return err
-		}
-		fmt.Println("Downloading: " + gifAddrs)
-
+func downloadImage(siteName string, gif Gif) (err error) {
+	resp, err := http.Get(gif.url)
+	if err != nil {
+		return err
 	}
+
+	os.Mkdir(siteName, 0755)
+	if err != nil {
+		return err
+	}
+	gifAddrs := siteName + "/" + gif.name
+	file, err := os.Create(gifAddrs)
+	fmt.Println(gifAddrs)
+	if err != nil {
+		return err
+	}
+	defer file.Close()
+
+	_, err = io.Copy(file, resp.Body)
+	if err != nil {
+		return err
+	}
+	fmt.Println("Downloading: " + gifAddrs)
 
 	return nil
 
+}
+
+func downloadWorker(id int, wg *sync.WaitGroup, siteName string, gif Gif) {
+	defer wg.Done()
+	fmt.Printf("Worker %d start:\n", id)
+	downloadImage(siteName, gif)
+	fmt.Printf("Worker %d over:\n", id)
 }
